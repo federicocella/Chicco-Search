@@ -29,14 +29,9 @@ prompt.get('website', function (err, result) {
        console.log('Salvato!');
      });
      var i = 0;
-     $('img').each(function () {
+     $('a').each(function () {
         i++;
-        console.log("Immagine: " + $(this).attr("alt"));
-        fs.appendFile('Post.html', "<img src=\"" + $(this).attr("src") + "\"><br>", function (err) {
-          if (err) throw err;
-        });
-        downloadImage($(this).attr("src"), "Img" + i + ".jpg");
-
+        console.log("Found: " + $(this).attr("href"));
      });
      //console.log("Page title:  " + body);
      //console.log("Page title:  " + $.getElementById;
