@@ -5,18 +5,29 @@ var fs = require('fs');
 var prompt = require('prompt')
 const Path = require('path')
 const Axios = require('axios')
+var http = require('http');
+var colors = require('colors');
 
-var pageToVisit = "http://www.liceolussana.gov.it/new/";
+var pageToVisit = "http://www.liceoartisticobergamo.gov.it/";
 var visitedLinks = [0];
 var linksThatMatter = [0];
+var linksToVisit = [0];
+var wordToSearch = "liceo";
+var currentRequests = 0;
 
+prompt.message = colors.cyan("CHICCO SEARCH");
+prompt.delimiter = " > "
 prompt.start();
-prompt.get('website', function (err, result) {
+prompt.get('Website', function (err, result) {
 
-  if (result.website) {
-      pageToVisit = result.website;
+  if (result.Website) {
+      pageToVisit = result.Website;
   }
-  visitLink(pageToVisit);
+  prompt.get('Search', function(err, result) {
+    wordToSearch = result.Search;
+    visitLink(pageToVisit);
+  });
+
   //downloadImage();
   /*request(pageToVisit, function(error, response, body) {
    if(error) {s
@@ -45,7 +56,7 @@ prompt.get('website', function (err, result) {
 });
 
 function visitLink(linkToVisit) {
-  if (visitedLinks.length % 10 == 0) {
+  if (visitedLinks.length % 500 == 0) {
     console.log("Visited " + visitedLinks.length + " links");
   }
   if (!linkToVisit || linkToVisit.indexOf("#") != -1) {
@@ -58,23 +69,34 @@ function visitLink(linkToVisit) {
   {
     return;
   }
+  if (currentRequests < -1) {
+    return;
+  }
+  currentRequests++;
   visitedLinks.push(linkToVisit);
-  console.log("Visiting link " + linkToVisit);
+  //console.log("Visiting link " + linkToVisit);
   request(linkToVisit, function(error, response, body) {
    if(error) {
      //console.log("Error: " + error);
      return;
    }
    // Check status code (200 is HTTP OK)
-   console.log("Status code: " + response.statusCode);
+   // console.log("Status code: " + response.statusCode);
    if(response.statusCode === 200) {
      // Parse the document body
      var $ = cheerio.load(body);
-     console.log($('title').text());
-     $('a').each(function () {
-        var link = $(this).attr("href");
-        //console.log("Found: " + link);
-        visitLink(link);
+     var containsWord = search(wordToSearch, $('title').text());
+     //if (!containsWord) {
+       //containsWord = search(wordToSearch, $('meta[name=description]').content);
+     //}
+     if (containsWord) {
+       linksThatMatter.push(linkToVisit);
+       console.log(colors.cyan($('title').text()));
+       console.log($('meta[name=description]').attr('content') + "\n");
+     }
+     var count = 0;
+     $('a').each(function() {
+          visitLink($(this).attr('href'));
      });
    }
  });
