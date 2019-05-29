@@ -12,6 +12,7 @@
     "http": "0.0.0",
     "prompt": "*",
     "request": "^2.65.0",
+    "request-promise": "^4.2.4",
     "url-parse": "^1.0.5"
   }
 }
