@@ -7,7 +7,7 @@ const Path = require('path')
 const Axios = require('axios')
 var http = require('http');
 var colors = require('colors');
-
+//var Promise = require('promise');
 var pageToVisit = "http://www.liceoartisticobergamo.gov.it/";
 var visitedLinks = [0];
 var linksThatMatter = [0];
@@ -24,38 +24,46 @@ prompt.get('Website', function (err, result) {
       pageToVisit = result.Website;
   }
   prompt.get('Search', function(err, result) {
-    wordToSearch = result.Search;
-    visitLink(pageToVisit);
+    if (result.Search) {
+        wordToSearch = result.Search;
+    } else {
+      wordToSearch = "Liceo";
+    }
+    crawl();
   });
-
-  //downloadImage();
-  /*request(pageToVisit, function(error, response, body) {
-   if(error) {s
-     console.log("Error: " + error);
-   }
-   // Check status code (200 is HTTP OK)
-   console.log("Status code: " + response.statusCode);
-   if(response.statusCode === 200) {
-     // Parse the document body
-     var $ = cheerio.load(body);
-     visitedLinks.push(pageToVisit);
-     fs.writeFile('Post.html', '', function (err) {
-       if (err) throw err;
-       console.log('Salvato!');
-     });
-     $('a').each(function () {
-       if (!visitedLinks.find(function(value, index, arr) {return value == link;})) {
-         var link = $(this).attr("href");
-         //console.log("Found: " + link);
-         visitLink(link);
-         visitedLinks.push(link);
-       }
-     });*/
-     //console.log("Page title:  " + body);
-     //console.log("Page title:  " + $.getElementById;
 });
+function crawl() {
+  setInterval(function() {
+    //console.log("Visiting page: " + pageToVisit);
+    getNewLinkFromPage(pageToVisit, function(newLink) {
+      console.log("Next link: " + newLink);
+      visitedLinks.push(newLink);
+      if (pageToVisit && newLink) {
+        console.log("Visiting " + newLink);
+      }
+    })
+  }, 200);
+}
 
-function visitLink(linkToVisit) {
+function arrayContainsLink(arr, link) {
+  if (arr.find(function(value, index, array) { return value == link; }) == undefined) {
+    console.log("Trovato un link non visitato: " + link);
+    pageToVisit = link;
+    return false;
+  }
+  else {
+    console.log("Considerato un link ma è già stato visitato");
+    return true;
+  }
+  if (!link || link.indexOf("#") != -1) {
+    return true;
+  }
+  if (link.indexOf("http://") == -1 && link.indexOf("https://" == -1)) {
+    return true;
+  }
+}
+
+function getNewLinkFromPage(linkToVisit, callback) {
   if (visitedLinks.length % 500 == 0) {
     console.log("Visited " + visitedLinks.length + " links");
   }
@@ -65,23 +73,22 @@ function visitLink(linkToVisit) {
   if (linkToVisit.indexOf("http://") == -1 && linkToVisit.indexOf("https://" == -1)) {
     return;
   }
-  if (visitedLinks.find(function(value, index, arr) {return value == linkToVisit;}))
+  /*if (visitedLinks.find(function(value, index, arr) { return value == linkToVisit; }))
   {
     return;
-  }
+  }*/
   if (currentRequests < -1) {
     return;
   }
   currentRequests++;
-  visitedLinks.push(linkToVisit);
   //console.log("Visiting link " + linkToVisit);
   request(linkToVisit, function(error, response, body) {
    if(error) {
-     //console.log("Error: " + error);
+     console.log("Error: " + error);
      return;
    }
    // Check status code (200 is HTTP OK)
-   // console.log("Status code: " + response.statusCode);
+   console.log("Status code: " + response.statusCode);
    if(response.statusCode === 200) {
      // Parse the document body
      var $ = cheerio.load(body);
@@ -89,15 +96,25 @@ function visitLink(linkToVisit) {
      //if (!containsWord) {
        //containsWord = search(wordToSearch, $('meta[name=description]').content);
      //}
-     if (containsWord) {
+     if (containsWord || 1==1) {
        linksThatMatter.push(linkToVisit);
        console.log(colors.cyan($('title').text()));
-       console.log($('meta[name=description]').attr('content') + "\n");
+       //console.log($('meta[name=description]').attr('content') + "\n");
      }
-     var count = 0;
+     let found = false;
+     let nLinks = 0;
+     console.log($('a').length);
+     if ($('a').length <= 0) {
+       console.log("Page has no links");
+     }
      $('a').each(function() {
-          visitLink($(this).attr('href'));
+          if (found == false && arrayContainsLink(visitedLinks, $(this).attr('href')) == false) {
+              found = true;
+              console.log("callstack count:" + currentRequests);
+              return callback($(this).attr('href'));
+          }
      });
+     return
    }
  });
 }
