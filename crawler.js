@@ -15,13 +15,20 @@ var linksToVisit = [0];
 var wordToSearch = "liceo";
 var currentRequests = 0;
 
+var options = {
+  url: 'http://www.liceoartisticobergamo.gov.it/',
+  headers: {
+    'User-Agent': "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.71 Safari/537.36"
+  }
+};
+
 prompt.message = colors.cyan("CHICCO SEARCH \n");
 prompt.delimiter = " > "
 prompt.start();
 prompt.get('Website', function (err, result) {
 
   if (result.Website) {
-      pageToVisit = result.Website;
+      options.url = result.Website;
   }
   prompt.get('Search', function(err, result) {
     if (result.Search) {
@@ -34,21 +41,21 @@ prompt.get('Website', function (err, result) {
 });
 function crawl() {
   setInterval(function() {
-    //console.log("Visiting page: " + pageToVisit);
-    getNewLinkFromPage(pageToVisit, function(newLink, response) {
+    //console.log("Visiting page: " + options.url);
+    getNewLinkFromPage(options.url, function(newLink, response) {
       if (response == -1) {
         console.log(colors.green("Found a  page that has no links"));
         //console.log(visitedLinks);
-        pageToVisit = visitedLinks[visitedLinks.indexOf(newLink)-1];
+        options.url = visitedLinks[visitedLinks.indexOf(newLink)-1];
         return;
       }
       console.log("Next link: " + newLink);
       visitedLinks.push(newLink);
-      if (pageToVisit && newLink && response == 1) {
+      if (options.url && newLink && response == 1) {
         console.log("Visiting " + newLink);
       }
     })
-  }, 100);
+  }, 300);
 }
 
 function arrayContainsLink(arr, link) {
@@ -56,13 +63,13 @@ function arrayContainsLink(arr, link) {
     return true;
     console.log("Considerato un link ma è un link interno: " + link);
   }
-  if (link.indexOf("http://") == -1 && link.indexOf("https://" == -1)) {
+  if (link.indexOf("http://") == -1 && link.indexOf("https://") == -1 || link.indexOf("linkedin") != -1) {
     console.log("Considerato un link ma non è http: " + link);
     return true;
   }
   if (arr.find(function(value, index, array) { return value == link; }) == undefined) {
     console.log("Trovato un link non visitato: " + link);
-    pageToVisit = link;
+    options.url = link;
     return false;
   }
   else {
@@ -74,12 +81,6 @@ function arrayContainsLink(arr, link) {
 function getNewLinkFromPage(linkToVisit, callback) {
   if (visitedLinks.length % 500 == 0) {
     console.log("Visited " + visitedLinks.length + " links");
-  }
-  if (!linkToVisit || linkToVisit.indexOf("#") != -1) {
-    return;
-  }
-  if (linkToVisit.indexOf("http://") == -1 && linkToVisit.indexOf("https://" == -1)) {
-    return;
   }
   /*if (visitedLinks.find(function(value, index, arr) { return value == linkToVisit; }))
   {
