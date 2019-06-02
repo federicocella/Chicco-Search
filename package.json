@@ -6,10 +6,13 @@
   "author": "Stephen",
   "license": "ISC",
   "dependencies": {
-    "cheerio": "^0.22.0",
-    "request": "^2.65.0",
-    "url-parse": "^1.0.5",
     "axios": "*",
-    "prompt": "*"
+    "cheerio": "^0.22.0",
+    "colors": "^1.3.3",
+    "http": "0.0.0",
+    "prompt": "*",
+    "request": "^2.65.0",
+    "request-promise": "^4.2.4",
+    "url-parse": "^1.0.5"
   }
 }
