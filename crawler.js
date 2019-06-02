@@ -1,4 +1,4 @@
-var request = require('request');
+var request = require('request-promise');
 var cheerio = require('cheerio');
 var URL = require('url-parse');
 var fs = require('fs');
@@ -15,7 +15,7 @@ var linksToVisit = [0];
 var wordToSearch = "liceo";
 var currentRequests = 0;
 
-prompt.message = colors.cyan("CHICCO SEARCH");
+prompt.message = colors.cyan("CHICCO SEARCH \n");
 prompt.delimiter = " > "
 prompt.start();
 prompt.get('Website', function (err, result) {
@@ -35,30 +35,38 @@ prompt.get('Website', function (err, result) {
 function crawl() {
   setInterval(function() {
     //console.log("Visiting page: " + pageToVisit);
-    getNewLinkFromPage(pageToVisit, function(newLink) {
+    getNewLinkFromPage(pageToVisit, function(newLink, response) {
+      if (response == -1) {
+        console.log(colors.green("Found a  page that has no links"));
+        //console.log(visitedLinks);
+        pageToVisit = visitedLinks[visitedLinks.indexOf(newLink)-1];
+        return;
+      }
       console.log("Next link: " + newLink);
       visitedLinks.push(newLink);
-      if (pageToVisit && newLink) {
+      if (pageToVisit && newLink && response == 1) {
         console.log("Visiting " + newLink);
       }
     })
-  }, 200);
+  }, 100);
 }
 
 function arrayContainsLink(arr, link) {
+  if (!link || link.indexOf("#") != -1) {
+    return true;
+    console.log("Considerato un link ma è un link interno: " + link);
+  }
+  if (link.indexOf("http://") == -1 && link.indexOf("https://" == -1)) {
+    console.log("Considerato un link ma non è http: " + link);
+    return true;
+  }
   if (arr.find(function(value, index, array) { return value == link; }) == undefined) {
     console.log("Trovato un link non visitato: " + link);
     pageToVisit = link;
     return false;
   }
   else {
-    console.log("Considerato un link ma è già stato visitato");
-    return true;
-  }
-  if (!link || link.indexOf("#") != -1) {
-    return true;
-  }
-  if (link.indexOf("http://") == -1 && link.indexOf("https://" == -1)) {
+    console.log("Considerato un link ma è già stato visitato: " + link);
     return true;
   }
 }
@@ -85,7 +93,7 @@ function getNewLinkFromPage(linkToVisit, callback) {
   request(linkToVisit, function(error, response, body) {
    if(error) {
      console.log("Error: " + error);
-     return;
+     return callback(linkToVisit, -1);
    }
    // Check status code (200 is HTTP OK)
    console.log("Status code: " + response.statusCode);
@@ -106,16 +114,22 @@ function getNewLinkFromPage(linkToVisit, callback) {
      console.log($('a').length);
      if ($('a').length <= 0) {
        console.log("Page has no links");
+       return callback(linkToVisit, -1);
      }
      $('a').each(function() {
           if (found == false && arrayContainsLink(visitedLinks, $(this).attr('href')) == false) {
               found = true;
-              console.log("callstack count:" + currentRequests);
-              return callback($(this).attr('href'));
+              console.log("Pages visited:" + visitedLinks.length);
+              //visitedLinks.push($(this).attr('href'));
+              return callback($(this).attr('href'), 1);
           }
      });
-     return
+     if (!found) {
+       return callback(linkToVisit, -1);
+     }
+     return;
    }
+   return;
  });
 }
 
