@@ -19,7 +19,9 @@ var options = {
   url: 'http://www.liceoartisticobergamo.gov.it/',
   headers: {
     'User-Agent': "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.71 Safari/537.36"
-  }
+  },
+  timeout: 300,
+  pool: {maxSockets: 10}
 };
 
 prompt.message = colors.cyan("CHICCO SEARCH \n");
@@ -55,7 +57,7 @@ function crawl() {
         console.log("Visiting " + newLink);
       }
     })
-  }, 300);
+  }, 500);
 }
 
 function arrayContainsLink(arr, link) {
@@ -65,6 +67,10 @@ function arrayContainsLink(arr, link) {
   }
   if (link.indexOf("http://") == -1 && link.indexOf("https://") == -1 || link.indexOf("linkedin") != -1) {
     console.log("Considerato un link ma non è http: " + link);
+    return true;
+  }
+  if (link.indexOf('?') != -1) {
+    console.log(colors.blue("Considerato un link ma è strano"));
     return true;
   }
   if (arr.find(function(value, index, array) { return value == link; }) == undefined) {
@@ -94,10 +100,16 @@ function getNewLinkFromPage(linkToVisit, callback) {
   request(linkToVisit, function(error, response, body) {
    if(error) {
      console.log("Error: " + error);
+     if (err.code === 'ETIMEDOUT') {
+       console.log("Timed out request");
+     }
      return callback(linkToVisit, -1);
    }
    // Check status code (200 is HTTP OK)
    console.log("Status code: " + response.statusCode);
+   if (response.statusCode < 200 || response.statusCode > 299) {
+     return callback(linkToVisit, -1);
+   }
    if(response.statusCode === 200) {
      // Parse the document body
      var $ = cheerio.load(body);
@@ -111,7 +123,6 @@ function getNewLinkFromPage(linkToVisit, callback) {
        //console.log($('meta[name=description]').attr('content') + "\n");
      }
      let found = false;
-     let nLinks = 0;
      console.log($('a').length);
      if ($('a').length <= 0) {
        console.log("Page has no links");
@@ -122,7 +133,8 @@ function getNewLinkFromPage(linkToVisit, callback) {
               found = true;
               console.log("Pages visited:" + visitedLinks.length);
               //visitedLinks.push($(this).attr('href'));
-              return callback($(this).attr('href'), 1);
+              let linkToPass = $(this).attr('href');
+              return callback(linkToPass, 1);
           }
      });
      if (!found) {
