@@ -14,6 +14,7 @@ var linksThatMatter = [0];
 var linksToVisit = [0];
 var wordToSearch = "liceo";
 var currentRequests = 0;
+var maxBodyLength = 0;
 
 var options = {
   url: 'http://www.liceoartisticobergamo.gov.it/',
@@ -21,7 +22,7 @@ var options = {
     'User-Agent': "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.71 Safari/537.36"
   },
   timeout: 300,
-  pool: {maxSockets: 10}
+  pool: {maxSockets: 3}
 };
 
 prompt.message = colors.cyan("CHICCO SEARCH \n");
@@ -44,42 +45,45 @@ prompt.get('Website', function (err, result) {
 function crawl() {
   setInterval(function() {
     //console.log("Visiting page: " + options.url);
-    getNewLinkFromPage(options.url, function(newLink, response) {
-      if (response == -1) {
-        console.log(colors.green("Found a  page that has no links"));
-        //console.log(visitedLinks);
-        options.url = visitedLinks[visitedLinks.indexOf(newLink)-1];
-        return;
-      }
-      console.log("Next link: " + newLink);
-      visitedLinks.push(newLink);
-      if (options.url && newLink && response == 1) {
-        console.log("Visiting " + newLink);
-      }
-    })
-  }, 500);
+    if (options.url && currentRequests < 10) {
+      getNewLinkFromPage(options.url, function(newLink, response) {
+        currentRequests--;
+        //console.log(colors.yellow("Current requests: " + currentRequests));
+        if (response == -1) {
+          //console.log(colors.green("Found a page that has no links :" + newLink));
+          //console.log(visitedLinks);
+          options.url = visitedLinks[visitedLinks.indexOf(newLink)-1];
+          return;
+        }
+        visitedLinks.push(newLink);
+        if (newLink && response == 1) {
+          //console.log("Visiting " + newLink);
+        }
+      });
+    }
+  }, 10);
 }
 
 function arrayContainsLink(arr, link) {
   if (!link || link.indexOf("#") != -1) {
     return true;
-    console.log("Considerato un link ma è un link interno: " + link);
+    //console.log("Considerato un link ma è un link interno: " + link);
   }
   if (link.indexOf("http://") == -1 && link.indexOf("https://") == -1 || link.indexOf("linkedin") != -1) {
-    console.log("Considerato un link ma non è http: " + link);
+    //console.log("Considerato un link ma non è http: " + link);
     return true;
   }
   if (link.indexOf('?') != -1) {
-    console.log(colors.blue("Considerato un link ma è strano"));
+    //console.log(colors.blue("Considerato un link ma è strano"));
     return true;
   }
   if (arr.find(function(value, index, array) { return value == link; }) == undefined) {
-    console.log("Trovato un link non visitato: " + link);
+    //console.log("Trovato un link non visitato: " + link);
     options.url = link;
     return false;
   }
   else {
-    console.log("Considerato un link ma è già stato visitato: " + link);
+    //console.log("Considerato un link ma è già stato visitato: " + link);
     return true;
   }
 }
@@ -96,42 +100,49 @@ function getNewLinkFromPage(linkToVisit, callback) {
     return;
   }
   currentRequests++;
-  //console.log("Visiting link " + linkToVisit);
   request(linkToVisit, function(error, response, body) {
    if(error) {
-     console.log("Error: " + error);
-     if (err.code === 'ETIMEDOUT') {
-       console.log("Timed out request");
+     //console.log("Error: " + error);
+     if (error.code === 'ETIMEDOUT') {
+       //console.log("Timed out request");
      }
      return callback(linkToVisit, -1);
    }
    // Check status code (200 is HTTP OK)
-   console.log("Status code: " + response.statusCode);
+   //console.log("Status code: " + response.statusCode);
    if (response.statusCode < 200 || response.statusCode > 299) {
      return callback(linkToVisit, -1);
    }
    if(response.statusCode === 200) {
      // Parse the document body
+     //console.log(colors.yellow("Body length: " + body.length));
+     if (maxBodyLength < body.length) {
+       maxBodyLength = body.length;
+       console.log(colors.yellow("This is the maximum length reached"));
+     }
+     if (body.length > 500000) {
+       //console.log(colors.red("Page skipped because of maximum length limits"));
+       return callback(linkToVisit, -1);
+     }
      var $ = cheerio.load(body);
      var containsWord = search(wordToSearch, $('title').text());
      //if (!containsWord) {
        //containsWord = search(wordToSearch, $('meta[name=description]').content);
      //}
-     if (containsWord || 1==1) {
+     if (containsWord || 1 == 1) {
        linksThatMatter.push(linkToVisit);
        console.log(colors.cyan($('title').text()));
-       //console.log($('meta[name=description]').attr('content') + "\n");
+       console.log(linkToVisit);
      }
      let found = false;
-     console.log($('a').length);
+     console.log($('a').length + "\n");
      if ($('a').length <= 0) {
-       console.log("Page has no links");
        return callback(linkToVisit, -1);
      }
      $('a').each(function() {
           if (found == false && arrayContainsLink(visitedLinks, $(this).attr('href')) == false) {
               found = true;
-              console.log("Pages visited:" + visitedLinks.length);
+              console.log("Visited pages:" + visitedLinks.length);
               //visitedLinks.push($(this).attr('href'));
               let linkToPass = $(this).attr('href');
               return callback(linkToPass, 1);
