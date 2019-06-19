@@ -10,17 +10,23 @@ var colors = require('colors');
 var mongo = require('mongodb');
 //var Promise = require('promise');
 var pageToVisit = "http://www.liceoartisticobergamo.gov.it/";
-var visitedLinks = [0];
+var visitedLinks = 0;
 var linksThatMatter = [0];
 var linksToVisit = [0];
 var wordToSearch = "liceo";
 var currentRequests = 0;
+var $;
+var randomI;
+var memory = [30];
+var deadEnds = 0;
 
 // SETTINGS
-const maxRequests = 20;       // Maximum number of parallel requests
+const maxRequests = 10;       // Maximum number of parallel requests
 const maxPageSize = 500000;   // Maximum body.length to be parsed by cheerio
-const reqTimeout = 800;       // Request timeout
-const resultMaxLength = 200;
+const reqTimeout = 500;       // Request timeout
+const processTimeout = 500;
+const resultMaxLength = 100;
+const memorySize = 60;
 
 var MongoClient = require('mongodb').MongoClient;
 var dbUrl = "mongodb://localhost:27017/mydb";
@@ -41,15 +47,8 @@ prompt.get('Website', function (err, result) {
   if (result.Website) {
       options.url = result.Website;
   }
-  prompt.get('Search', function(err, result) {
-    if (result.Search) {
-        wordToSearch = result.Search;
-    } else {
-      wordToSearch = "Liceo";
-    }
     crawl();
     //showResults();
-  });
 });
 
 function showResults() {
@@ -83,52 +82,51 @@ function crawl() {
         currentRequests--;
         //console.log(colors.yellow("Current requests: " + currentRequests));
         if (response == -1) {
+          deadEnds++;
           //console.log(colors.green("Found a page that has no links :" + newLink));
-          //console.log(visitedLinks);
-          options.url = visitedLinks[visitedLinks.indexOf(newLink)-1];
+          console.log(colors.blue("Dead end"));
+          options.url = memory[memory.length-(deadEnds + 1)];
           return;
         }
-        visitedLinks.push(newLink);
         if (newLink && response == 1) {
-          //console.log("Visiting " + newLink);
+          deadEnds = 0;
+          if (memory.length >= memorySize) {
+              memory.shift();
+          }
+          memory.push(newLink);
+          visitedLinks++;
+          options.url = newLink;
+          console.log("Visiting " + newLink);
         }
       });
     }
   }, 100);
 }
 
-function arrayContainsLink(arr, link) {
+function followable(link) {
   if (!link || link.indexOf("#") != -1) {
-    return true;
+    return false;
     //console.log("Considerato un link ma è un link interno: " + link);
   }
   if (link.indexOf("http://") == -1 && link.indexOf("https://") == -1 || link.indexOf("linkedin") != -1) {
     //console.log("Considerato un link ma non è http: " + link);
-    return true;
+    return false;
   }
   if (link.indexOf('?') != -1) {
     //console.log(colors.blue("Considerato un link ma è strano"));
-    return true;
-  }
-  if (arr.find(function(value, index, array) { return value == link; }) == undefined) {
-    //console.log("Trovato un link non visitato: " + link);
-    options.url = link;
     return false;
   }
-  else {
-    //console.log("Considerato un link ma è già stato visitato: " + link);
-    return true;
+  if (memory.find(function(value, index, arr) { return value == link; }))
+  {
+    return false;
   }
+  return true;
 }
 
 function getNewLinkFromPage(linkToVisit, callback) {
-  if (visitedLinks.length % 50 == 0) {
-    console.log("Visited " + visitedLinks.length + " links");
+  if (visitedLinks % 10 == 0) {
+    console.log("Visited " + visitedLinks + " links");
   }
-  /*if (visitedLinks.find(function(value, index, arr) { return value == linkToVisit; }))
-  {
-    return;
-  }*/
   if (currentRequests < -1) {
     return;
   }
@@ -153,16 +151,11 @@ function getNewLinkFromPage(linkToVisit, callback) {
        //console.log(colors.red("Page skipped because of maximum length limits"));
        return callback(linkToVisit, -1);
      }
-     var $ = cheerio.load(body);
-     var containsWord = search(wordToSearch, $('title').text());
+     $ = cheerio.load(body);
+     //var containsWord = search(wordToSearch, $('title').text());
      //if (!containsWord) {
        //containsWord = search(wordToSearch, $('meta[name=description]').content);
      //}
-     if (containsWord || 1 == 1) {
-       linksThatMatter.push(linkToVisit);
-       //console.log(colors.cyan($('title').text()));
-       //console.log(linkToVisit);
-     }
 
      MongoClient.connect(dbUrl, { useNewUrlParser: true }, function(err, db) {
        if (err) throw err;
@@ -179,19 +172,17 @@ function getNewLinkFromPage(linkToVisit, callback) {
      if ($('a').length <= 0) {
        return callback(linkToVisit, -1);
      }
-     $('a').each(function() {
-          if (found == false && arrayContainsLink(visitedLinks, $(this).attr('href')) == false) {
-              found = true;
-              //console.log("Visited pages:" + visitedLinks.length);
-              //visitedLinks.push($(this).attr('href'));
-              let linkToPass = $(this).attr('href');
-              return callback(linkToPass, 1);
-          }
-     });
-     if (!found) {
-       return callback(linkToVisit, -1);
+     for (var i = 0; i < $('a').length && !found ; i++) {
+       randomI = Math.floor(Math.random()*$('a').length);
+        //console.log("Visited pages:" + visitedLinks.length);
+        //visitedLinks.push($(this).attr('href'));
+        let linkToPass = $('a').eq(randomI).attr('href');
+        if (followable(linkToPass)) {
+            return callback(linkToPass, 1);
+        }
      }
-     return;
+     console.log(colors.red("no followable links"));
+     return callback(linkToVisit, -1);
    }
    return;
  });
